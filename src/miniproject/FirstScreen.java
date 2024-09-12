@@ -1,15 +1,26 @@
 package miniproject;
 
 import javax.swing.*;
-import javax.swing.event.AncestorListener;
+import javax.xml.crypto.Data;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.text.NumberFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.sql.Date;
+import java.util.List;
 
 public class FirstScreen {
 
+  static Connection conn;
+  static int total = 0;
+  static int totalCount = 0;
   // 첫 번째 화면 (인트로 화면)
   public static void createIntroFrame() {
     JFrame introFrame = new JFrame("KOSTA CAFE");
@@ -20,10 +31,9 @@ public class FirstScreen {
     introFrame.setLocationRelativeTo(null);
 
     // back 이미지 생성 (이미지 패널)
+    JPanel introPanel = new JPanel() {
+      private Image bgImage = new ImageIcon(getClass().getResource("/miniproject/back2.png")).getImage();
 
-
-      JPanel introPanel = new JPanel() {
-        private Image bgImage = new ImageIcon(getClass().getResource("/miniproject/back2.png")).getImage();
       @Override
       public void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -48,20 +58,23 @@ public class FirstScreen {
     introbutton.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {
-      createMemberFrame();
-
-         }
-   });
+        createMemberFrame();
+      }
+    });
 
 
     // 인트로화면 클릭 이벤트
     introPanel.addMouseListener(new MouseAdapter() {
       @Override
       public void mouseClicked(MouseEvent e) {
-
         // 첫 번째 프레임을 닫고 두 번째 프레임을 열기
-        introFrame.dispose();
-        createMainFrame();  // 두 번째 프레임 생성
+
+        try {
+          createMainFrame();  // 두 번째 프레임 생성
+        } catch (SQLException ex) {
+          throw new RuntimeException(ex);
+        }
+
       }
     });
 
@@ -73,7 +86,7 @@ public class FirstScreen {
     JFrame mfrm = new JFrame("회원 등록");
     mfrm.setSize(800, 1050);
     mfrm.setLocationRelativeTo(null);
-//    mfrm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    mfrm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     mfrm.setLayout(new BorderLayout());
 
     // 텍스트 패널 생성
@@ -113,20 +126,22 @@ public class FirstScreen {
     mtextPanel.add(phoneLabel);
 
     // 텍스트에어리어 생성
-    JTextArea textArea = new JTextArea(1,5);
-    JTextArea textArea2 = new JTextArea(1, 5);
+    JTextArea nameTextArea = new JTextArea(1,5);
+    JTextArea phoneTextArea = new JTextArea(1, 5);
 
-    textArea.setBounds(200,330,400,30);
-    textArea2.setBounds(200,450,400,30);
-    textArea.setFont(new Font("Dialog", Font.BOLD, 20));
-    textArea2.setFont(new Font("Dialog", Font.BOLD, 20));
+    nameTextArea.setBounds(200,330,400,30);
+    nameTextArea.setFont(new Font("Dialog", Font.BOLD, 20));
+    phoneTextArea.setBounds(200,450,400,30);
+    phoneTextArea.setFont(new Font("Dialog", Font.BOLD, 20));
 
-    textArea.setEditable(true);
-    textArea2.setEditable(true);
+    nameTextArea.setEditable(true);
+    phoneTextArea.setEditable(true);
 
-    // 패널에 JTextAtrea 추가
-    mtextPanel.add(textArea);
-    mtextPanel.add(textArea2);
+
+
+    // 패널에 JTextArea 추가
+    mtextPanel.add(nameTextArea);
+    mtextPanel.add(phoneTextArea);
 
     mfrm.add(mtextPanel, BorderLayout.CENTER);
 
@@ -135,9 +150,29 @@ public class FirstScreen {
       @Override
       public void actionPerformed(ActionEvent e) {
         // textArea, textArea2 의 데이터를 DB member 로 이동시키는 코드 작성
+        String inputName = nameTextArea.getText();
+        String inputPhone = phoneTextArea.getText();
 
-        mfrm.dispose();
-        createIntroFrame();
+        try {
+          conn = DataBase.makeConnection();
+        } catch (SQLException ex) {
+          throw new RuntimeException(ex);
+        }
+
+        if (!inputName.matches("[a-zA-Z가-힣 ]+")) {
+          JOptionPane.showMessageDialog(mfrm, "이름에 한글 및 영문자만 입력 가능합니다");
+        }
+        else if ((!inputPhone.matches("\\d+"))) {
+          JOptionPane.showMessageDialog(mfrm, "핸드폰 번호에 숫자만 입력 가능합니다");
+        }
+        else if (DataBase.getMemberInfo(conn, inputPhone) != null) {
+          JOptionPane.showMessageDialog(mfrm, "해당 번호가 이미 등록되어 있습니다");
+        }
+        else {
+          DataBase.addNewMember(conn, inputName, inputPhone);
+          JOptionPane.showMessageDialog(mfrm, "회원이 된 것을 축하드립니다. 1000포인트 지급해드렸습니다.");
+          mfrm.dispose();
+        }
       }
     });
 
@@ -146,28 +181,41 @@ public class FirstScreen {
       @Override
       public void actionPerformed(ActionEvent e) {
         mfrm.dispose();
-        createIntroFrame();
       }
     });
 
     mfrm.setVisible(true);
   } // 회원 등록 프레임 끝
   // 두 번째 화면
-  public static void createMainFrame() {
+  public static void createMainFrame() throws SQLException {
     JFrame frm = new JFrame("KOSTA CAFE");
     frm.setSize(800, 1050);
     frm.setLocationRelativeTo(null);
     frm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
     frm.setLayout(new BorderLayout());
 
-    // 메뉴 아이템, 가격 배열 생성 ( sql 로 가져와야함 ) 임시자료
-    String[] menuItems = {"Ice Americano", "Ice CafeLatte", "Ice Tea", "Americano", "CafeLatte", "Tea"};
-    int[] prices = {3000, 3500, 4000, 2500, 3000, 3500};
-    String[] serving = {"1oz", "2oz", "3oz", "4oz", "5oz", "6oz"};
-    String[] info = {"제품정보1", "제품정보2", "제품정보3", "제품정보4", "제품정보5", "제품정보6"};
-    String[] allergy = {"알러지정보1", "알러지정보2", "알러지정보3", "알러지정보4", "알러지정보5", "알러지정보6"};
-    int[] counts = new int[menuItems.length];
+    List<Product> products = DataBase.getPersonInfos(DataBase.makeConnection());
 
+    // 배열 크기를 product 리스트 크기로 지정
+    String[] menuItems = new String[products.size()];
+    int[] prices = new int[products.size()];
+    String[] info = new String[products.size()];
+    String[] serving = new String[products.size()];
+    String[] allergy = new String[products.size()];
+    String[] calorie = new String[products.size()];
+
+
+    // 리스트 데이터를 배열에 저장
+    for (int i = 0; i < products.size(); i++) {
+      menuItems[i] = products.get(i).getName();
+      prices[i] = (int) products.get(i).getPrice();
+      info[i] = products.get(i).getInfo();
+      serving[i] = products.get(i).getServing();
+      allergy[i] = products.get(i).getAllergy();
+      calorie[i] = products.get(i).getCalorie();
+    }
+
+    int[] counts = new int[menuItems.length];
     // 이미지 패널 생성
     ImagePanel imagePanel1 = new ImagePanel("/miniproject/cafe1.png");
     ImagePanel imagePanel2 = new ImagePanel("/miniproject/cafe2.png");
@@ -212,8 +260,8 @@ public class FirstScreen {
 
     // total 라벨
     JLabel totalLabel = new JLabel("TOTAL : 0원");
-    totalLabel.setBounds(50,650,200,50);
-    totalLabel.setFont(new Font("Dialog", Font.BOLD, 20));
+    totalLabel.setBounds(50,650,600,50);
+    totalLabel.setFont(new Font("Dialog", Font.BOLD, 15));
 
     // 오더리스트 업데이트 메서드
     ActionListener orderListener = new ActionListener() {
@@ -232,14 +280,17 @@ public class FirstScreen {
       // 오더리스트 업데이트
       private void updateOrder(){
         StringBuilder sb = new StringBuilder();
-        int total = 0;
+        total = 0;
+        totalCount = 0;
         for (int i = 0; i < menuItems.length; i++) {
           if(counts[i] > 0){
             sb.append(menuItems[i]).append(" X ").append(counts[i]).append(" = ")
                 .append(counts[i] * prices[i]).append("원\n");
             total += counts[i]*prices[i];
+            totalCount += counts[i];
           }
         }
+
         orderDetails.setText(sb.toString());
         totalLabel.setText("TOTAL : " + total + "원");
 
@@ -261,10 +312,29 @@ public class FirstScreen {
     btn7.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {
-        JOptionPane.showMessageDialog(null, totalLabel.getText() + "\n결제 부탁드립니다.");
-        // 오더리스트 초기화 코드 와야함
-        clearOrder();
+        //
+        int inputTotalQty = totalCount;
+        int inputPrice = total;
+        Date inputDate = Date.valueOf(LocalDate.now());
 
+
+//        int inputMemberId = ;
+      // JOptionPane.showConfirmDialog 호출
+        int result = JOptionPane.showConfirmDialog(null, totalLabel.getText() + "\n결제 부탁드립니다.");
+        try {
+          conn = DataBase.makeConnection();
+
+          System.out.println("연결!!!!!");
+        } catch (SQLException ex) {
+          throw new RuntimeException(ex);
+        }
+
+        // 사용자가 확인 버튼을 클릭한 경우에만 clearOrder 호출
+        if (result == JOptionPane.OK_OPTION) {
+          DataBase.addNewOrder(conn, inputTotalQty, inputPrice, inputDate);
+
+          clearOrder();
+        }
       }
       private void clearOrder() {
         for (int i = 0; i < menuItems.length; i++) {
@@ -290,7 +360,6 @@ public class FirstScreen {
       }
     });
 
-
     btn7.setBounds(550, 700, 200, 50);
     btn7.setFont(new Font("Dialog", Font.BOLD, 15));
     btn8.setBounds(550, 900, 200, 50);
@@ -300,15 +369,17 @@ public class FirstScreen {
     btn9.setFont(new Font("Dialog", Font.BOLD, 15));
     btn9.setToolTipText("핸드폰번호 입력시 포인트 사용 가능합니다.");
 
-    // 포인트 사용 클릭 이벤트
+
+    // 포인트 사용
     btn9.addActionListener(new ActionListener() {
+      boolean memberInfoExists = false;
+      int availablePointAmt = 0;
       @Override
       public void actionPerformed(ActionEvent e) {
-        JFrame pointFrame = new JFrame("포인트 사용");
 
+        JFrame pointFrame = new JFrame("포인트 사용");
         // 포인트창 사이즈 설정
         pointFrame.setSize(600, 400);
-//        pointFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         pointFrame.setLocationRelativeTo(null);
         pointFrame.setLayout(null);
         pointFrame.setVisible(true);
@@ -320,11 +391,11 @@ public class FirstScreen {
 
         // 라벨 생성, 폰트, 위치, 사이즈 설정
         JLabel phoneLabel = new JLabel("핸드폰 번호");
-        JLabel pointLabel = new JLabel("사용 가능한 포인트 : " + "포인트 데이터 입력칸" );
+        JLabel pointLabel = new JLabel();
         phoneLabel.setFont(new Font("Dialog", Font.BOLD, 15));
         pointLabel.setFont(new Font("Dialog", Font.BOLD, 15));
-        phoneLabel.setBounds(100, 60, 300, 30);
-        pointLabel.setBounds(100, 140, 300, 30);
+        phoneLabel.setBounds(100, 60, 400, 30);
+        pointLabel.setBounds(100, 140, 400, 30);
 
         // 텍스트 에어리어 생성, 폰트, 위치, 사이즈 설정
         JTextArea phoneText = new JTextArea();
@@ -353,15 +424,61 @@ public class FirstScreen {
           public void actionPerformed(ActionEvent e) {
             // DB member_Phone 비교 후 중복 되지 않으면 member_Point 조회 후
             // pointLabel에 출력
+            try {
+              conn = DataBase.makeConnection();
+              ArrayList<String> memberInfo = DataBase.getMemberInfo(conn, phoneText.getText());
+
+              if (memberInfo == null) {
+                memberInfoExists = false;
+                pointLabel.setText("해당 번호로 등록된 회원 정보가 없습니다");
+              } else {
+                memberInfoExists = true;
+
+                // 포인트 값이 null인지 확인
+                String pointString = memberInfo.get(1);
+                if (pointString != null && !pointString.isEmpty()) {
+                  availablePointAmt = Integer.parseInt(pointString);
+                  pointLabel.setText(memberInfo.get(0) + " 회원님의 사용가능한 포인트: " + availablePointAmt);
+                } else {
+                  pointLabel.setText("회원님의 포인트 정보가 없습니다");
+                }
+              }
+            } catch (SQLException ex) {
+              throw new RuntimeException(ex);
+            } catch (NumberFormatException ex) {
+              pointLabel.setText("포인트 값을 숫자로 변환할 수 없습니다.");
+            }
             pointText.setEditable(true);
           }
         });
 
         // 사용 버튼 이벤트
+
         okButton.addActionListener(new ActionListener() {
           @Override
           public void actionPerformed(ActionEvent e) {
             // pointLabel에 출력된 금액을 mainFrame의 Total에서
+            String text = pointText.getText();
+
+
+            int inputPointAmt = (text == null || text.equals("")) ? 0 : Integer.parseInt(text);
+
+            if (!memberInfoExists) {
+              pointLabel.setText("회원 정보를 조회해주세요");
+            }
+            else if (inputPointAmt == 0) {
+              pointLabel.setText("아래칸에 사용하실 포인트 값을 입력해주세요");
+            }
+            else if (inputPointAmt % 1000 != 0) {
+              pointLabel.setText("1000 단위로 입력해주세요");
+            }
+            else if (inputPointAmt > availablePointAmt) {
+              pointLabel.setText("사용 가능한 포인트가 부족합니다");
+            }
+            else {
+              totalLabel.setText(totalLabel.getText() + " - " + inputPointAmt + "원(포인트) = " + (total - inputPointAmt) + "원");
+              pointFrame.dispose();
+            }
           }
         });
 
@@ -369,10 +486,11 @@ public class FirstScreen {
         cancelButton.addActionListener(new ActionListener() {
           @Override
           public void actionPerformed(ActionEvent e) {
+            memberInfoExists = false;
+            availablePointAmt = 0;
             pointFrame.dispose();
           }
         });
-
 
         // 패널에 JTextAtrea 추가
         pointPanel.add(phoneText);
@@ -385,17 +503,12 @@ public class FirstScreen {
         pointPanel.add(phoneLabel);
         pointPanel.add(pointLabel);
         pointFrame.add(pointPanel);
-        
-        
-
       }
-    }); // 포인트 사용 클릭 이벤트
-
+    });
 
     frm.getContentPane().add(btn7);
     frm.getContentPane().add(btn8);
     frm.getContentPane().add(btn9);
-
 
 
     // 텍스트 패널에 스크롤 패널 추가
