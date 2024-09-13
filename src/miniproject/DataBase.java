@@ -133,22 +133,50 @@ public class DataBase {
   }
 
   // 오더 테이블에 들어가기
-  public static void addNewOrder(Connection conn, int order_TotalQty, int order_Price, Date order_Date){
+  public static int addNewOrder(Connection conn, int order_TotalQty, int order_Price, Date order_Date){
+    int id = -1;
     String sql = "INSERT INTO `cafe`.`Order_Header` (`order_TotalQty`, `order_Price`, `order_Date`) VALUES (?, ?, ?);";
 
     try {
-      PreparedStatement ps = conn.prepareStatement(sql);
+      PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
       ps.setInt(1, order_TotalQty);
       ps.setInt(2, order_Price);
       ps.setDate(3, order_Date);
       // 현재 에러 상태
 //      ps.setInt(4, member_Id);
-      ps.executeUpdate();
+      int affectedRows = ps.executeUpdate();
+
+      if (affectedRows > 0) {
+        try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
+          if (generatedKeys.next()) {
+            id = generatedKeys.getInt(1); // 생성된 ID 값
+            System.out.println("id : " + id);
+          }
+        }
+      }
       System.out.println("Order successfully added.");
+
     }
     catch (SQLException e) {
-
       System.out.println("SQL error while running888: " + e.getMessage());
+    }
+    return id;
+  }
+
+
+  // 오더 디테일에 들어가기
+  public static void addNewOrderDetail(Connection conn, int order_Id, int product_Id, int order_Qty ){
+    String sql = "INSERT INTO `cafe`.`Order_Detail` (`order_Id`, `product_Id`, `order_Qty`) VALUES (?, ?, ?);";
+
+    try {
+      PreparedStatement ps = conn.prepareStatement(sql);
+      ps.setInt(1, order_Id);
+      ps.setInt(2, product_Id);
+      ps.setInt(3, order_Qty);
+      ps.executeUpdate();
+    }catch (SQLException e) {
+      e.printStackTrace();
+      System.out.println("sql에러 : " + e.getMessage());
     }
   }
 
