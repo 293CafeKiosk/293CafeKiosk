@@ -89,20 +89,20 @@ public class DBCafe {
   // Product 목록 추가
   public static void insertProducts(Connection conn) throws SQLException {
     String selectSql = "SELECT COUNT(*) FROM Product WHERE product_Name = ?";
-    String insertSql = "INSERT INTO Product (product_Name, product_Price, product_Info, product_Serving, product_Allergy) " +
-            "VALUES (?, ?, ?, ?, ?)";
+    String insertSql = "INSERT INTO Product (product_Name, product_Price, product_Info, product_Serving, product_Allergy, product_Calorie) " +
+            "VALUES (?, ?, ?, ?, ?, ?)";
 
     PreparedStatement selectPs = conn.prepareStatement(selectSql);
     PreparedStatement insertPs = conn.prepareStatement(insertSql);
 
     // 제품 데이터 배열
     String[][] products = {
-            {"Ice Americano", "3000", "KOSTA커피 블렌드 원두로 추출한 에스프레소에 물을 더해, 풍부한 바디감을 느낄 수 있는 스탠다드 커피", "One size / 24oz", "고카페인 함유", "25"},
-            {"Ice Cafelatte", "3500", "진한 에스프레소와 부드러운 우유가 어우러져 고소한 풍미를 완성한 라떼", "One size / 20oz", "우유, 고카페인 함유", "200"},
-            {"Ice Tea", "4000", "깊은 맛의 홍차와의 은은한 향이 어우러진 시원한 여름철 인기 음료", "One size / 24oz", "복숭아, 아황산류", "100"},
-            {"Americano", "2500", "KOSTA커피 블렌드 원두로 추출한 에스프레소에 물을 더해, 풍부한 바디감을 느낄 수 있는 스탠다드 커피", "One size / 20oz", "고카페인 함유", "25"},
-            {"Cafelatte", "3500", "진한 에스프레소와 부드러운 우유가 어우러져 고소한 풍미를 완성한 라떼", "One size / 20oz", "우유, 고카페인 함유", "200"},
-            {"Tea", "3500", "상큼한 레몬의 맛과 향을 오롯이 살린 비타민C 가득한 과일티", "One size / 20oz", "없음", "100"}
+            {"Ice Americano", "3000", "KOSTA커피 블렌드 원두로 추출한 에스프레소에 물을 더해, 풍부한 바디감을 느낄 수 있는 스탠다드 커피", "One size / 24oz", "고카페인 함유", "25kcal"},
+            {"Ice Cafelatte", "3500", "진한 에스프레소와 부드러운 우유가 어우러져 고소한 풍미를 완성한 라떼", "One size / 20oz", "우유, 고카페인 함유", "200kcal"},
+            {"Ice Tea", "4000", "깊은 맛의 홍차와의 은은한 향이 어우러진 시원한 여름철 인기 음료", "One size / 24oz", "복숭아, 아황산류", "100kcal"},
+            {"Americano", "2500", "KOSTA커피 블렌드 원두로 추출한 에스프레소에 물을 더해, 풍부한 바디감을 느낄 수 있는 스탠다드 커피", "One size / 20oz", "고카페인 함유", "25kcal"},
+            {"Cafelatte", "3500", "진한 에스프레소와 부드러운 우유가 어우러져 고소한 풍미를 완성한 라떼", "One size / 20oz", "우유, 고카페인 함유", "200kcal"},
+            {"Tea", "3500", "상큼한 레몬의 맛과 향을 오롯이 살린 비타민C 가득한 과일티", "One size / 20oz", "없음", "100kcal"}
     };
 
     for (String[] product : products) {
@@ -119,6 +119,7 @@ public class DBCafe {
         insertPs.setString(3, product[2]);
         insertPs.setString(4, product[3]);
         insertPs.setString(5, product[4]);
+        insertPs.setString(6, product[5]);
         insertPs.executeUpdate();
       }
     }
@@ -151,6 +152,7 @@ public class DBCafe {
     return productList; // productList를 반환
   }
   ////// 자카님 작업
+  // Member 생성하기
   public static void addNewMember(Connection conn, String member_Name, String member_Phone) {
     String sql = "INSERT INTO `cafe`.`Member` (`member_Name`, `member_Phone`) VALUES (?, ?);";
     try {
@@ -166,6 +168,7 @@ public class DBCafe {
     }
   }
 
+  // Member 조회하기
   public static ArrayList<String> getMemberInfo(Connection conn, String member_Phone) {
     String sql = "select member_Name, member_Point from Member where member_Phone = ?;";
     ArrayList<String> result = new ArrayList<>();
@@ -191,25 +194,50 @@ public class DBCafe {
     }
   }
 
-  // 오더 테이블에 들어가기
-  public static void addNewOrder(Connection conn, int order_TotalQty, int order_Price, Date order_Date){
+  // OrderHeader 추가하기
+  public static int addNewOrderHeader(Connection conn, int order_TotalQuantity, int order_Price, Date order_Date){
+    int id = -1;
     String sql = "INSERT INTO `cafe`.`Order_Header` (`order_TotalQuantity`, `order_Price`, `order_Date`) VALUES (?, ?, ?);";
 
     try {
-      PreparedStatement ps = conn.prepareStatement(sql);
-      ps.setInt(1, order_TotalQty);
+      PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+      ps.setInt(1, order_TotalQuantity);
       ps.setInt(2, order_Price);
       ps.setDate(3, order_Date);
       // 현재 에러 상태
 //      ps.setInt(4, member_Id);
-      ps.executeUpdate();
+      int affectedRows = ps.executeUpdate();
+
+      if (affectedRows > 0) {
+        try (ResultSet generatedKeys = ps.getGeneratedKeys()) {
+          if (generatedKeys.next()) {
+            id = generatedKeys.getInt(1); // 생성된 ID 값
+            System.out.println("id : " + id);
+          }
+        }
+      }
       System.out.println("Order successfully added.");
+
     }
     catch (SQLException e) {
-
       System.out.println("SQL error while running888: " + e.getMessage());
+    }
+    return id;
+  }
+
+  // OrderDetail 추가하기
+  public static void addNewOrderDetail(Connection conn, int order_Id, int product_Id, int order_Qty ){
+    String sql = "INSERT INTO `cafe`.`Order_Detail` (`order_Id`, `product_Id`, `order_Quantity`) VALUES (?, ?, ?);";
+
+    try {
+      PreparedStatement ps = conn.prepareStatement(sql);
+      ps.setInt(1, order_Id);
+      ps.setInt(2, product_Id);
+      ps.setInt(3, order_Qty);
+      ps.executeUpdate();
+    }catch (SQLException e) {
+      e.printStackTrace();
+      System.out.println("sql에러 : " + e.getMessage());
     }
   }
 }
-
-

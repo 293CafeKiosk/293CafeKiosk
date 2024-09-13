@@ -1,6 +1,7 @@
 package miniproject;
 
 import javax.swing.*;
+
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -8,9 +9,12 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.sql.Connection;
 import java.sql.SQLException;
+
 import java.time.LocalDate;
+
 import java.util.ArrayList;
 import java.sql.Date;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -19,7 +23,10 @@ public class FirstScreen {
   static Connection conn;
   static int total = 0;
   static int totalCount = 0;
-
+  static int pid = 0;
+  static int qty = 0;
+  static List<Integer> pidList = new ArrayList<>();
+  static List<Integer> qtyList = new ArrayList<>();
   // 첫 번째 화면 (인트로 화면)
   public static void createIntroFrame() {
     JFrame introFrame = new JFrame("KOSTA CAFE");
@@ -31,7 +38,7 @@ public class FirstScreen {
 
     // back 이미지 생성 (이미지 패널)
     JPanel introPanel = new JPanel() {
-      private final Image bgImage = new ImageIcon(Objects.requireNonNull(getClass().getResource("/miniproject/back2.png"))).getImage();
+      private final Image bgImage = new ImageIcon(Objects.requireNonNull(getClass().getResource("/miniproject/back9.jpg"))).getImage();
 
       @Override
       public void paintComponent(Graphics g) {
@@ -81,10 +88,12 @@ public class FirstScreen {
     mfrm.setSize(800, 1050);
     mfrm.setLocationRelativeTo(null);
     mfrm.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
     mfrm.setLayout(new BorderLayout());
 
     // 텍스트 패널 생성
     JPanel mtextPanel = new JPanel();
+
 
     // 텍스트 수동배치
     mtextPanel.setLayout(null);
@@ -262,6 +271,8 @@ public class FirstScreen {
       // 오더리스트 업데이트
       private void updateOrder(){
         StringBuilder sb = new StringBuilder();
+//        String inputName = nameTextArea.getText();
+//        String inputPhone = phoneTextArea.getText();
         total = 0;
         totalCount = 0;
         for (int i = 0; i < menuItems.length; i++) {
@@ -270,9 +281,19 @@ public class FirstScreen {
                     .append(counts[i] * prices[i]).append("원\n");
             total += counts[i]*prices[i];
             totalCount += counts[i];
+            if (!(pidList.contains(i + 1))) {
+              // pid가 없을 경우
+              pidList.add(i+1);  // 각 pid를 리스트에 저장
+              qtyList.add(counts[i]);  // 각 qty를 리스트에 저장
+            } else {
+              // pid가 있을 경우
+              int pidIndex = pidList.indexOf(i + 1);
+              qtyList.set(pidIndex, counts[i]);
+            }
           }
         }
-
+        System.out.println(pid);
+        System.out.println(qty);
         orderDetails.setText(sb.toString());
         totalLabel.setText("TOTAL : " + total + "원");
 
@@ -299,7 +320,6 @@ public class FirstScreen {
         int inputPrice = total;
         Date inputDate = Date.valueOf(LocalDate.now());
 
-
 //        int inputMemberId = ;
         // JOptionPane.showConfirmDialog 호출
         int result = JOptionPane.showConfirmDialog(null, totalLabel.getText() + "\n결제 부탁드립니다.");
@@ -309,14 +329,22 @@ public class FirstScreen {
 
           // 사용자가 확인 버튼을 클릭한 경우에만 clearOrder 호출
         if (result == JOptionPane.OK_OPTION) {
-          DBCafe.addNewOrder(conn, inputTotalQty, inputPrice, inputDate);
-
+          int newId = DBCafe.addNewOrderHeader(conn, inputTotalQty, inputPrice, inputDate);
+          if (newId > -1) {
+            for (int i = 0; i < pidList.size(); i++) {
+              DBCafe.addNewOrderDetail(conn, newId, pidList.get(i), qtyList.get(i));
+            }
+          } else {
+            System.out.println("제대로 orderHeader ID가 생성되지 않았습니다.");
+          }
           clearOrder();
         }
       }
       private void clearOrder() {
         for (int i = 0; i < menuItems.length; i++) {
           counts[i] = 0;
+          pidList.clear();
+          qtyList.clear();
         }
         orderDetails.setText("");
         totalLabel.setText("TOTAL : 0 원");
@@ -330,9 +358,7 @@ public class FirstScreen {
         clearOrder();
       }
       private void clearOrder() {
-        for (int i = 0; i < counts.length; i++) {
-          counts[i] = 0;
-        }
+        Arrays.fill(counts, 0);
         orderDetails.setText("");
         totalLabel.setText("TOTAL : 0 원");
       }
@@ -356,6 +382,7 @@ public class FirstScreen {
       public void actionPerformed(ActionEvent e) {
 
         JFrame pointFrame = new JFrame("포인트 사용");
+
         // 포인트창 사이즈 설정
         pointFrame.setSize(600, 400);
         pointFrame.setLocationRelativeTo(null);
@@ -364,6 +391,7 @@ public class FirstScreen {
 
         // 패널 생성, 수동 배치 위치, 크기 조정 완료
         JPanel pointPanel = new JPanel();
+
         pointPanel.setLayout(null);
         pointPanel.setBounds(0, 0, 600, 400);
 
@@ -397,75 +425,66 @@ public class FirstScreen {
         cancelButton.setBounds(340, 220, 110, 30);
 
         // 조회 버튼 이벤트
-        checkButton.addActionListener(new ActionListener() {
-          @Override
-          public void actionPerformed(ActionEvent e) {
-            // DB member_Phone 비교 후 중복 되지 않으면 member_Point 조회 후
-            // pointLabel에 출력
-            try {
-              conn = DBCafe.makeConnection();
-              ArrayList<String> memberInfo = DBCafe.getMemberInfo(conn, phoneText.getText());
+        checkButton.addActionListener(e1 -> {
+          // DB member_Phone 비교 후 중복 되지 않으면 member_Point 조회 후
+          // pointLabel에 출력
+          try {
+            conn = DBCafe.makeConnection();
+            ArrayList<String> memberInfo = DBCafe.getMemberInfo(conn, phoneText.getText());
 
-              if (memberInfo == null) {
-                memberInfoExists = false;
-                pointLabel.setText("해당 번호로 등록된 회원 정보가 없습니다");
+            if (memberInfo == null) {
+              memberInfoExists = false;
+              pointLabel.setText("해당 번호로 등록된 회원 정보가 없습니다");
+            } else {
+              memberInfoExists = true;
+
+              // 포인트 값이 null인지 확인
+              String pointString = memberInfo.get(1);
+              if (pointString != null && !pointString.isEmpty()) {
+                availablePointAmt = Integer.parseInt(pointString);
+                pointLabel.setText(memberInfo.get(0) + " 회원님의 사용가능한 포인트: " + availablePointAmt);
               } else {
-                memberInfoExists = true;
-
-                // 포인트 값이 null인지 확인
-                String pointString = memberInfo.get(1);
-                if (pointString != null && !pointString.isEmpty()) {
-                  availablePointAmt = Integer.parseInt(pointString);
-                  pointLabel.setText(memberInfo.get(0) + " 회원님의 사용가능한 포인트: " + availablePointAmt);
-                } else {
-                  pointLabel.setText("회원님의 포인트 정보가 없습니다");
-                }
+                pointLabel.setText("회원님의 포인트 정보가 없습니다");
               }
-            } catch (NumberFormatException ex) {
-              pointLabel.setText("포인트 값을 숫자로 변환할 수 없습니다.");
             }
-            pointText.setEditable(true);
+          } catch (NumberFormatException ex) {
+            pointLabel.setText("포인트 값을 숫자로 변환할 수 없습니다.");
           }
+          pointText.setEditable(true);
         });
 
         // 사용 버튼 이벤트
 
-        okButton.addActionListener(new ActionListener() {
-          @Override
-          public void actionPerformed(ActionEvent e) {
-            // pointLabel에 출력된 금액을 mainFrame의 Total에서
-            String text = pointText.getText();
+        okButton.addActionListener(e12 -> {
+          // pointLabel에 출력된 금액을 mainFrame의 Total에서
+          String text = pointText.getText();
 
 
-            int inputPointAmt = (text == null || text.equals("")) ? 0 : Integer.parseInt(text);
+          int inputPointAmt = (text == null || text.isEmpty()) ? 0 : Integer.parseInt(text);
 
-            if (!memberInfoExists) {
-              pointLabel.setText("회원 정보를 조회해주세요");
-            }
-            else if (inputPointAmt == 0) {
-              pointLabel.setText("아래칸에 사용하실 포인트 값을 입력해주세요");
-            }
-            else if (inputPointAmt % 1000 != 0) {
-              pointLabel.setText("1000 단위로 입력해주세요");
-            }
-            else if (inputPointAmt > availablePointAmt) {
-              pointLabel.setText("사용 가능한 포인트가 부족합니다");
-            }
-            else {
-              totalLabel.setText(totalLabel.getText() + " - " + inputPointAmt + "원(포인트) = " + (total - inputPointAmt) + "원");
-              pointFrame.dispose();
-            }
+          if (!memberInfoExists) {
+            pointLabel.setText("회원 정보를 조회해주세요");
+          }
+          else if (inputPointAmt == 0) {
+            pointLabel.setText("아래칸에 사용하실 포인트 값을 입력해주세요");
+          }
+          else if (inputPointAmt % 1000 != 0) {
+            pointLabel.setText("1000 단위로 입력해주세요");
+          }
+          else if (inputPointAmt > availablePointAmt) {
+            pointLabel.setText("사용 가능한 포인트가 부족합니다");
+          }
+          else {
+            totalLabel.setText(totalLabel.getText() + " - " + inputPointAmt + "원(포인트) = " + (total - inputPointAmt) + "원");
+            pointFrame.dispose();
           }
         });
 
         // 취소 버튼 이벤트
-        cancelButton.addActionListener(new ActionListener() {
-          @Override
-          public void actionPerformed(ActionEvent e) {
-            memberInfoExists = false;
-            availablePointAmt = 0;
-            pointFrame.dispose();
-          }
+        cancelButton.addActionListener(e13 -> {
+          memberInfoExists = false;
+          availablePointAmt = 0;
+          pointFrame.dispose();
         });
 
         // 패널에 JTextAtrea 추가
@@ -489,9 +508,11 @@ public class FirstScreen {
 
     // 텍스트 패널에 스크롤 패널 추가
     JPanel textPanel = new JPanel();
+
     textPanel.setLayout(null);
     textPanel.add(scroll);
     textPanel.add(totalLabel);
+
 
     // 이미지 및 텍스트 패널 추가
     frm.add(imagePanel1);
@@ -538,12 +559,11 @@ public class FirstScreen {
 
   // 메인 메서드
   public static void main(String[] args) {
-    try {
-      DBCafe.main(args);
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
-    }
-
+      try {
+          DBCafe.main(args);
+      } catch (SQLException e) {
+          throw new RuntimeException(e);
+      }
       // 인트로 프레임 생성
     createIntroFrame();
 
@@ -554,10 +574,10 @@ public class FirstScreen {
 
   // 이미지 패널 클래스
   static class ImagePanel extends JPanel {
-    private Image image;
+    private final Image image;
 
     public ImagePanel(String imagePath) {
-      image = new ImageIcon(getClass().getResource(imagePath)).getImage();
+      image = new ImageIcon(Objects.requireNonNull(getClass().getResource(imagePath))).getImage();
     }
 
     @Override
