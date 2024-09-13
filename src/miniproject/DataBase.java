@@ -141,6 +141,7 @@ public class DataBase {
       ps.setInt(1, order_TotalQty);
       ps.setInt(2, order_Price);
       ps.setDate(3, order_Date);
+      // 현재 에러 상태
 //      ps.setInt(4, member_Id);
       ps.executeUpdate();
       System.out.println("Order successfully added.");
