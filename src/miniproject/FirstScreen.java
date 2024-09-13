@@ -169,7 +169,7 @@ public class FirstScreen {
     // 메뉴 아이템, 가격 배열 생성 ( sql 로 가져와야함 ) 임시자료
 
     // DB에서 productName과 productPrice 가져오기
-    List<Product> products = DBCafe.getPersonInfos(DBCafe.makeConnection());
+    List<Product> products = DBCafe.getProductInfos(DBCafe.makeConnection());
 
     // 배열 크기를 product 리스트 크기로 지정
     String[] menuItems = new String[products.size()];
